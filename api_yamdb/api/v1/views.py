@@ -1,21 +1,5 @@
-from django.contrib.auth import get_user_model
-from django.db.models import Avg
-from django.db import IntegrityError
-from django.shortcuts import get_object_or_404
-from django_filters.rest_framework import DjangoFilterBackend
-from rest_framework import status, viewsets, filters
-from rest_framework.decorators import action
-from rest_framework.decorators import api_view, permission_classes
-from rest_framework.permissions import (
-    AllowAny,
-    IsAuthenticated,
-    IsAuthenticatedOrReadOnly,
-)
-from rest_framework.response import Response
-from rest_framework_simplejwt.tokens import AccessToken
-
-from reviews.models import Category, Genre, Title, Review
 from api.v1.filters import TitleFilter
+from api.v1.mixins import ListCreateDestroyGeneric
 from api.v1.permissions import (
     IsAdmin,
     IsAdminOrReadOnly,
@@ -32,9 +16,22 @@ from api.v1.serializers import (
     TitleSerializer,
     UsersSerializer,
 )
-from api.v1.mixins import ListCreateDestroyGeneric
 from api.v1.utils import send_email_with_confirmation_code
-
+from django.contrib.auth import get_user_model
+from django.db import IntegrityError
+from django.db.models import Avg
+from django.shortcuts import get_object_or_404
+from django_filters.rest_framework import DjangoFilterBackend
+from rest_framework import filters, status, viewsets
+from rest_framework.decorators import action, api_view, permission_classes
+from rest_framework.permissions import (
+    AllowAny,
+    IsAuthenticated,
+    IsAuthenticatedOrReadOnly,
+)
+from rest_framework.response import Response
+from rest_framework_simplejwt.tokens import AccessToken
+from reviews.models import Category, Genre, Review, Title
 
 User = get_user_model()
 
@@ -50,10 +47,7 @@ def auth_signup_post(request):
         return Response(request.data, status=status.HTTP_200_OK)
     serializer.is_valid(raise_exception=True)
     try:
-        user, _ = User.objects.get_or_create(
-            username=username,
-            email=email
-        )
+        user, _ = User.objects.get_or_create(username=username, email=email)
     except IntegrityError:
         return Response(
             "Пользователь с таким именем или email-ом уже существует",
@@ -111,7 +105,7 @@ class UsersViewSet(viewsets.ModelViewSet):
         if request.method == "PUT":
             return Response(
                 "Метод PUT не разрешен!",
-                status=status.HTTP_405_METHOD_NOT_ALLOWED
+                status=status.HTTP_405_METHOD_NOT_ALLOWED,
             )
         return super().update(request, *args, **kwargs)
 
@@ -142,8 +136,10 @@ class GenreViewSet(ListCreateDestroyGeneric):
 
 class TitleViewSet(viewsets.ModelViewSet):
     queryset = (
-        Title.objects.prefetch_related("reviews").all().
-        annotate(rating=Avg("reviews__score")).order_by("id")
+        Title.objects.prefetch_related("reviews")
+        .all()
+        .annotate(rating=Avg("reviews__score"))
+        .order_by("id")
     )
     serializer_class = TitleSerializer
     permission_classes = (
@@ -170,7 +166,7 @@ class CommentViewSet(viewsets.ModelViewSet):
         review = get_object_or_404(
             Review,
             pk=self.kwargs.get("review_id"),
-            title=self.kwargs.get("title_id")
+            title=self.kwargs.get("title_id"),
         )
         return review.comments.all()
 
@@ -178,7 +174,7 @@ class CommentViewSet(viewsets.ModelViewSet):
         review = get_object_or_404(
             Review,
             pk=self.kwargs.get("review_id"),
-            title=self.kwargs.get("title_id")
+            title=self.kwargs.get("title_id"),
         )
         serializer.save(review=review, author=self.request.user)
 
